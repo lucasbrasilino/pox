@@ -46,6 +46,7 @@ class ethernet(packet_base):
 
   IP_TYPE    = 0x0800
   ARP_TYPE   = 0x0806
+  HOTOM_TYPE = 0X080A
   RARP_TYPE  = 0x8035
   VLAN_TYPE  = 0x8100
   LLDP_TYPE  = 0x88cc
@@ -91,6 +92,8 @@ class ethernet(packet_base):
       from mpls import mpls
       ethernet.type_parsers[ethernet.MPLS_TYPE] = mpls
       ethernet.type_parsers[ethernet.MPLS_MC_TYPE] = mpls
+      from hotom import hotom
+      ethernet.type_parsers[ethernet.HOTOM_TYPE] = hotom
       from llc import llc
       ethernet._llc = llc
 
