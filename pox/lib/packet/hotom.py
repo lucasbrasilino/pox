@@ -1,6 +1,7 @@
 import struct
 
 from pox.lib.packet.packet_base import packet_base
+from pox.lib.packet.ethernet import ETHER_ANY
 from pox.lib.addresses import *
 
 class hotom(packet_base):
@@ -14,8 +15,9 @@ class hotom(packet_base):
         self.prev = prev
         self.next = None
 
-        self.net_id = 0
-        self.dstsrc = 0
+        self.net_id = ETHER_ANY
+        self.dst = ETHER_ANY
+        self.src = ETHER_ANY
 
         if raw is not None:
             self.parse(raw)
@@ -25,8 +27,8 @@ class hotom(packet_base):
     def __str__(self):
         s = "[HotOM net_id={0} dst={1} src={2}]".format(
             self.net_id.toStr()[9:],
-            self.dstsrc.toStr()[0:8],
-            self.dstsrc.toStr()[9:])
+            self.dst.toStr(),
+            self.src.toStr())
         return s
 
     def parse(self, raw):
@@ -39,10 +41,11 @@ class hotom(packet_base):
             return
 
         self.net_id = EthAddr('\x00\x00\x00'+raw[:3])
-        self.dstsrc = EthAddr(raw[3:9])
+        self.dst = EthAddr('\x00\x00\x00'+raw[3:6])
+        self.src = EthAddr('\x00\x00\x00'+raw[6:9])
         self.next = raw[hotom.LEN:]
         self.parsed = True
 
     def hdr(self,payload):
-        return struct.pack('!3s6s', self.net_id.toRaw()[3:],
-                           self.dstsrc.toRaw())
+        return struct.pack('!3s3s3s', self.net_id.toRaw()[3:],
+                           self.dst.toRaw()[3:],self.src.toRaw()[3:])
