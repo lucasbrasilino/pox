@@ -1,13 +1,39 @@
+# Copyright 2014,2015 Lucas Brasilino <lucas.brasilino@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at:
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This code was inspired, but not developed from, ethernet pox library
+
+#================================
+# HotOM Header
+#================================
+
 import struct
 
 from pox.lib.packet.packet_base import packet_base
+from pox.lib.packet.packet_utils import ethtype_to_str
 from pox.lib.packet.ethernet import ETHER_ANY
 from pox.lib.addresses import *
 
 class hotom(packet_base):
     "HotOM header"
 
-    LEN = 9
+    LEN = 10
+    IP_TYPE = 0x00
+
+    typetable = {
+        IP_TYPE : 0x0800
+    }
 
     def __init__(self, raw=None, prev=None, **kw):
         packet_base.__init__(self)
@@ -18,6 +44,7 @@ class hotom(packet_base):
         self.net_id = 0
         self.dst = ETHER_ANY
         self.src = ETHER_ANY
+        self.type = hotom.IP_TYPE
 
         if raw is not None:
             self.parse(raw)
@@ -25,10 +52,11 @@ class hotom(packet_base):
         self._init(kw)
 
     def __str__(self):
-        s = "[HotOM net_id={0} dst={1} src={2}]".format(
+        s = "[HotOM net_id={0} dst={1} src={2} type={3}]".format(
             hex(self.net_id),
             self.dst.toStr()[9:],
-            self.src.toStr()[9:])
+            self.src.toStr()[9:],
+            ethtype_to_str(hotom.typetable[self.type]))
         return s
 
     def parse(self, raw):
@@ -41,10 +69,12 @@ class hotom(packet_base):
             return
 
         nid=raw[:3]
-        (nid_msb,nid_lsb,dst,src) = struct.unpack("!HB3s3s",raw[:hotom.LEN])
+        (nid_msb,nid_lsb,dst,src,type) = struct.unpack("!HB3s3sB",
+                                                       raw[:hotom.LEN])
         self.net_id = ((nid_msb<<8)+nid_lsb)
-        self.dst = EthAddr(nid+dst)
-        self.src = EthAddr(nid+src)
+        self.dst = EthAddr(b"\x00\x00\x00"+dst)
+        self.src = EthAddr(b"\x00\x00\x00"+src)
+        self.type = type
         self.next = raw[hotom.LEN:]
         self.parsed = True
 
@@ -75,14 +105,14 @@ class hotom(packet_base):
     def _dstsrc_setter(self,val):
         net_id = self.net_id_pack()
         if isinstance(val,EthAddr):
-            return EthAddr(net_id+val.toRaw()[3:])
+            return EthAddr(b"\x00\x00\x00"+val.toRaw()[3:])
         if isinstance(val,bytes):
-            if (len(val) == 6):
-                return EthAddr(net_id+val)
-            if (len(val) == 17):
-                return EthAddr(self.net_id_toStr() + val[9:])
+            if (len(val) == 3):
+                return EthAddr(b"\x00\x00\x00"+val)
+            if (len(val) == 8):
+                return EthAddr("00:00:00:" + val)
 
     def hdr(self,payload):
         nid = self.net_id_pack()
-        return nid + struct.pack('!3s3s', self.dst.toRaw()[3:], 
-                                 self.src.toRaw()[3:])
+        return nid + struct.pack('!3s3sB', self.dst.toRaw()[3:], 
+                                 self.src.toRaw()[3:],self.type)
